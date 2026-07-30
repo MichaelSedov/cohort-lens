@@ -9,7 +9,16 @@
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "@types/pg-copy-streams": "^1.2.5",
+    "@types/seedrandom": "^3.0.8",
     "tsx": "4.19.1",
     "typescript": "5.6.3"
+  },
+  "dependencies": {
+    "date-fns": "^4.4.0",
+    "pg": "^8.22.0",
+    "pg-copy-streams": "^7.0.0",
+    "seedrandom": "^3.0.5"
   }
 }
