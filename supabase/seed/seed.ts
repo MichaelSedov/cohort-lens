@@ -197,6 +197,15 @@ async function main() {
   await client.query("commit");
   console.log(`[seed] commit done. total cohort_daily=${totalCohort}  (${fmt(t0)})`);
 
+  // Update planner stats + visibility map so the covering index enables
+  // Index-Only Scan on first query. Without this, autovacuum eventually
+  // catches up but the first few benchmark runs would be slow for no reason.
+  console.log(`[seed] running VACUUM ANALYZE (planner stats + visibility map)...`);
+  await client.query("vacuum analyze cohort_daily");
+  await client.query("vacuum analyze fx_rates");
+  await client.query("vacuum analyze campaigns");
+  console.log(`[seed] vacuum done  (${fmt(t0)})`);
+
   // Summary
   const counts = await client.query(`
     select 'orgs' t, count(*)::int c from orgs

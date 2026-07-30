@@ -1,0 +1,58 @@
+                                                                                                  QUERY PLAN                                                                                                   
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=35133.59..35133.66 rows=30 width=82) (actual time=117.390..119.959 rows=20 loops=1)
+   Buffers: shared hit=2634
+   ->  Sort  (cost=35133.59..35133.66 rows=30 width=82) (actual time=117.387..119.954 rows=20 loops=1)
+         Sort Key: ((sum(((cd.spend_micros)::numeric * COALESCE(fx.rate_to_usd, '1'::numeric))) / '1000000'::numeric)) DESC
+         Sort Method: quicksort  Memory: 27kB
+         Buffers: shared hit=2634
+         ->  Finalize GroupAggregate  (cost=35124.20..35132.85 rows=30 width=82) (actual time=117.260..119.924 rows=20 loops=1)
+               Group Key: c.channel, cd.country
+               Buffers: shared hit=2631
+               ->  Gather Merge  (cost=35124.20..35131.20 rows=60 width=82) (actual time=117.238..119.844 rows=60 loops=1)
+                     Workers Planned: 2
+                     Workers Launched: 2
+                     Buffers: shared hit=2631
+                     ->  Sort  (cost=34124.18..34124.25 rows=30 width=82) (actual time=114.562..114.568 rows=20 loops=3)
+                           Sort Key: c.channel, cd.country
+                           Sort Method: quicksort  Memory: 28kB
+                           Buffers: shared hit=2631
+                           Worker 0:  Sort Method: quicksort  Memory: 28kB
+                           Worker 1:  Sort Method: quicksort  Memory: 28kB
+                           ->  Partial HashAggregate  (cost=34122.99..34123.44 rows=30 width=82) (actual time=114.415..114.425 rows=20 loops=3)
+                                 Group Key: c.channel, cd.country
+                                 Batches: 1  Memory Usage: 48kB
+                                 Buffers: shared hit=2615
+                                 Worker 0:  Batches: 1  Memory Usage: 48kB
+                                 Worker 1:  Batches: 1  Memory Usage: 48kB
+                                 ->  Hash Left Join  (cost=2810.63..33580.27 rows=24121 width=40) (actual time=1.818..95.201 rows=18600 loops=3)
+                                       Hash Cond: ((cd.cohort_date = fx.day) AND (cd.currency = fx.currency))
+                                       Buffers: shared hit=2615
+                                       ->  Hash Join  (cost=2767.75..33410.54 rows=24121 width=38) (actual time=1.105..82.393 rows=18600 loops=3)
+                                             Hash Cond: (cd.campaign_id = c.id)
+                                             Buffers: shared hit=2564
+                                             ->  Parallel Bitmap Heap Scan on cohort_daily cd  (cost=2765.40..33340.40 rows=24121 width=47) (actual time=1.045..58.818 rows=18600 loops=3)
+                                                   Recheck Cond: ((org_id = '02f6ecda-3572-485f-b97d-2bb0baecaedc'::uuid) AND (cohort_date >= '2026-01-01'::date) AND (cohort_date <= '2026-03-31'::date))
+                                                   Filter: (day_index <= 30)
+                                                   Rows Removed by Filter: 36000
+                                                   Heap Blocks: exact=755
+                                                   Buffers: shared hit=2539
+                                                   ->  Bitmap Index Scan on cohort_daily_org_date_idx  (cost=0.00..2750.93 rows=167880 width=0) (actual time=2.787..2.788 rows=163800 loops=1)
+                                                         Index Cond: ((org_id = '02f6ecda-3572-485f-b97d-2bb0baecaedc'::uuid) AND (cohort_date >= '2026-01-01'::date) AND (cohort_date <= '2026-03-31'::date))
+                                                         Buffers: shared hit=182
+                                             ->  Hash  (cost=1.60..1.60 rows=60 width=23) (actual time=0.033..0.033 rows=60 loops=3)
+                                                   Buckets: 1024  Batches: 1  Memory Usage: 12kB
+                                                   Buffers: shared hit=3
+                                                   ->  Seq Scan on campaigns c  (cost=0.00..1.60 rows=60 width=23) (actual time=0.013..0.018 rows=60 loops=3)
+                                                         Buffers: shared hit=3
+                                       ->  Hash  (cost=22.55..22.55 rows=1355 width=18) (actual time=0.676..0.676 rows=1355 loops=3)
+                                             Buckets: 2048  Batches: 1  Memory Usage: 85kB
+                                             Buffers: shared hit=27
+                                             ->  Seq Scan on fx_rates fx  (cost=0.00..22.55 rows=1355 width=18) (actual time=0.023..0.418 rows=1355 loops=3)
+                                                   Buffers: shared hit=27
+ Planning:
+   Buffers: shared hit=450
+ Planning Time: 0.929 ms
+ Execution Time: 120.093 ms
+(54 rows)
+
