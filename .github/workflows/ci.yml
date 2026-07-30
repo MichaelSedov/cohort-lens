@@ -8,34 +8,59 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: postgres
-        ports: ["54322:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.5
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
+
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
       - run: pnpm install --frozen-lockfile
+
+      - name: Start Supabase local stack (docker)
+        run: supabase start
+
+      - name: Seed the database (also runs VACUUM ANALYZE)
+        run: pnpm db:seed
+
+      - name: Boot Edge Functions in the background
+        run: |
+          pnpm functions:serve &
+          echo $! > /tmp/functions.pid
+          # Poll until the runtime is answering; give up after 60s.
+          for i in $(seq 1 60); do
+            if curl -sSf -o /dev/null -w "%{http_code}" \
+                 http://127.0.0.1:54321/functions/v1/campaigns \
+                 -H "apikey: $(supabase status -o json | jq -r .ANON_KEY)" \
+                 | grep -qE "^(200|400|401|403|405)$"; then
+              echo "functions:serve up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "functions:serve failed to come up"
+          exit 1
+
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+
+      - name: Run the benchmark (fails if optimised p95 >= 250ms)
+        run: pnpm bench
+
+      - name: Tear down Edge Functions
+        if: always()
+        run: kill $(cat /tmp/functions.pid) 2>/dev/null || true

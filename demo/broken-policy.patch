@@ -1,0 +1,13 @@
+diff --git a/supabase/migrations/0004_rls_policies.sql b/supabase/migrations/0004_rls_policies.sql
+index fa915b6..b40ae25 100644
+--- a/supabase/migrations/0004_rls_policies.sql
++++ b/supabase/migrations/0004_rls_policies.sql
+@@ -21,7 +21,7 @@ stable
+ security definer
+ set search_path = public
+ as $$
+-  select org_id from public.org_members where user_id = auth.uid();
++  select org_id from public.org_members;  -- BUG: dropped user_id filter
+ $$;
+ 
+ revoke all on function public.current_user_org_ids() from public;
