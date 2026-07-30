@@ -1,0 +1,28 @@
+{
+  "name": "cohort-lens",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset --no-seed",
+    "db:seed": "pnpm --filter @cohort-lens/seed run seed",
+    "functions:serve": "supabase functions serve --env-file ./.env",
+    "mcp:dev": "pnpm --filter @cohort-lens/mcp run dev",
+    "mcp:inspect": "pnpm --filter @cohort-lens/mcp run inspect",
+    "bench": "pnpm --filter @cohort-lens/bench run bench",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "vitest": "2.1.4",
+    "@types/node": "20.16.11"
+  }
+}

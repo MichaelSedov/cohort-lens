@@ -1,0 +1,17 @@
+{
+  "name": "@cohort-lens/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx/esm src/index.ts",
+    "inspect": "npx @modelcontextprotocol/inspector node --import tsx/esm src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsx": "4.19.1",
+    "typescript": "5.6.3"
+  }
+}

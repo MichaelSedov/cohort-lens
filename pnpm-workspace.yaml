@@ -1,0 +1,4 @@
+packages:
+  - "mcp-server"
+  - "bench"
+  - "supabase/seed"
