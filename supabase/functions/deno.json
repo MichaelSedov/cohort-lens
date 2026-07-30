@@ -1,0 +1,17 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "zod": "npm:zod@3.23.8",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.45.4"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["deno.window", "es2022"]
+  },
+  "lint": {
+    "rules": { "tags": ["recommended"] }
+  }
+}
