@@ -113,9 +113,9 @@ export function buildCampaigns(rng: Rng, apps: App[]): Campaign[] {
     if (!perOrg.has(a.org_id)) perOrg.set(a.org_id, []);
     perOrg.get(a.org_id)!.push(a);
   }
+  const CAMPAIGNS_PER_ORG = Number(process.env.SEED_CAMPAIGNS_PER_ORG ?? 8);
   for (const [orgId, orgApps] of perOrg) {
-    const target = 20; // deterministic to keep row counts stable
-    for (let i = 0; i < target; i++) {
+    for (let i = 0; i < CAMPAIGNS_PER_ORG; i++) {
       const app = orgApps[i % orgApps.length]!;
       const channel = CHANNELS[i % CHANNELS.length]!;
       const country = COUNTRIES[i % COUNTRIES.length]!;
@@ -135,10 +135,11 @@ export function buildCampaigns(rng: Rng, apps: App[]): Campaign[] {
 
 export function buildCreatives(rng: Rng, campaigns: Campaign[]): Creative[] {
   const out: Creative[] = [];
-  // 20 creatives per campaign → 400/org, ~1200 total (within spec 300-600 per org for
-  // "typical" but we widen so top-2 selection has choice).
+  // 10 creatives per campaign — enough for top-2 selection to have a couple
+  // of losers to reject, without inflating storage.
+  const CREATIVES_PER_CAMPAIGN = Number(process.env.SEED_CREATIVES_PER_CAMPAIGN ?? 10);
   for (const c of campaigns) {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < CREATIVES_PER_CAMPAIGN; i++) {
       out.push({
         id: uuid(rng),
         org_id: c.org_id,

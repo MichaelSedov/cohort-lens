@@ -33,8 +33,12 @@ const DATABASE_URL =
   process.env.DATABASE_URL ??
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 
-const COHORT_DAYS = 180;
-const CREATIVE_COHORT_WINDOW = 90;
+// Row-budget knobs. Defaults keep the seeded DB under ~150 MB so it fits
+// Supabase's Free tier (500 MB soft cap). Bench and RLS story still work.
+// Override with SEED_COHORT_DAYS / SEED_CREATIVE_WINDOW / SEED_CAMPAIGNS_PER_ORG
+// if you're on Pro or running locally and want the fatter dataset.
+const COHORT_DAYS = Number(process.env.SEED_COHORT_DAYS ?? 90);
+const CREATIVE_COHORT_WINDOW = Number(process.env.SEED_CREATIVE_WINDOW ?? 45);
 
 // Cohort start date is deterministic so re-runs produce identical fx_rates keys.
 const START_DATE = new Date(Date.UTC(2026, 0, 1)); // 2026-01-01
@@ -48,6 +52,10 @@ async function main() {
   const rng = makeRng(seed);
   const client = new Client({ connectionString: DATABASE_URL });
   await client.connect();
+  // Supabase pooler (session mode) can hand out sessions whose default
+  // transaction is read-only — force read-write once so UPDATE / INSERT
+  // work everywhere the seeder needs them.
+  await client.query("set session default_transaction_read_only = off");
 
   console.log(`[seed] connected, seed=${seed}`);
 
@@ -77,27 +85,50 @@ async function main() {
       [email],
     );
     if (existing.rows.length > 0) return existing.rows[0]!;
+    // Every varchar/text column that GoTrue's Go struct reads as `string`
+    // (not sql.NullString) has to be an empty string, not NULL, or login
+    // errors with "converting NULL to string is unsupported". Cloud is
+    // stricter than the local docker stack — belt every column here.
     const inserted = await client.query<{ id: string; email: string }>(
       `insert into auth.users
          (instance_id, id, aud, role, email, encrypted_password,
           email_confirmed_at, created_at, updated_at,
           raw_app_meta_data, raw_user_meta_data, is_super_admin,
-          -- GoTrue's Go struct reads these as string, not sql.NullString, so
-          -- NULL causes "converting NULL to string is unsupported" on login.
-          confirmation_token, email_change_token_new, email_change_token_current,
-          recovery_token, reauthentication_token)
+          confirmation_token, email_change, email_change_token_new,
+          email_change_token_current, recovery_token, reauthentication_token,
+          phone_change, phone_change_token)
        values (
          '00000000-0000-0000-0000-000000000000',
          gen_random_uuid(), 'authenticated', 'authenticated',
          $1, crypt('password', gen_salt('bf')),
          now(), now(), now(),
          '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, false,
-         '', '', '', '', ''
+         '', '', '', '', '', '', '', ''
        )
        returning id, email;`,
       [email],
     );
-    return inserted.rows[0]!;
+    const user = inserted.rows[0]!;
+    // GoTrue requires an auth.identities row per user for email/password
+    // logins. Direct INSERT into auth.users alone doesn't create one; we
+    // build the identity here with the same JSONB shape GoTrue writes.
+    // `email` is a generated column, so we omit it from the column list.
+    await client.query(
+      `insert into auth.identities
+         (id, user_id, provider_id, provider, identity_data,
+          created_at, updated_at, last_sign_in_at)
+       values
+         (gen_random_uuid(), $1::uuid, $1::text, 'email',
+          jsonb_build_object(
+            'sub',            $1::text,
+            'email',          $2::text,
+            'email_verified', true,
+            'phone_verified', false),
+          now(), now(), now())
+       on conflict do nothing;`,
+      [user.id, user.email],
+    );
+    return user;
   };
   const userIds: { email: string; id: string }[] = [];
   for (const org of orgs) {
