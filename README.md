@@ -91,11 +91,10 @@ to ~5×. Full plans in `bench/results/`.
 
 </details>
 
-## Quickstart
+## Local development
 
 Prereqs: Docker, Node 20 (nvm), pnpm 10, `supabase` CLI (`npm i -g supabase`),
-Deno (`curl -fsSL https://deno.land/install.sh | sh`). Full walk-through in
-[SETUP.md](SETUP.md).
+Deno (`curl -fsSL https://deno.land/install.sh | sh`).
 
 ```bash
 pnpm install
@@ -134,11 +133,6 @@ pnpm mcp:inspect                            # or wire the same env into Claude
 - No SKAN / probabilistic attribution. Separate math problem, out of scope.
 - No caching layer. Would add ETag + a Redis rollup once the read patterns
   are actually known, not up-front.
-
-## Deploy
-
-See [DEPLOY.md](DEPLOY.md) for pushing the schema + Edge Functions to a
-Supabase project and the dashboard to Vercel.
 
 ## License
 
