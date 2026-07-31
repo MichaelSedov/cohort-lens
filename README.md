@@ -1,5 +1,7 @@
 # cohort-lens
 
+**Live demo:** [cohort-lens-web-beta.vercel.app](https://cohort-lens-web-beta.vercel.app/) — login with any seed user (password: `password`).
+
 Multi-tenant marketing analytics slice. Three layers:
 
 - Postgres with RLS as the isolation boundary
@@ -15,7 +17,7 @@ tenant isolation and hot-query performance.
 ```
 supabase/
   migrations/     schema, RLS, indexes, RPCs
-  seed/           deterministic seeder, ~2M cohort rows in ~15s
+  seed/           deterministic seeder, ~400k cohort rows in ~4s
   functions/      BFF: cohort-performance · cohort-compare · creative-score
                        campaigns · ask (OpenRouter tool loop)
 web/              React + Vite dashboard with a chat panel
@@ -49,14 +51,14 @@ No mocks between them.
 ## Numbers
 
 Warm run, `2026-01-01..2026-03-31`, groupBy=[channel, country], `dayIndex≤30`,
-seeded `acme-games` (~655k rows on that org):
+seeded `acme-games` (~131k rows on that org). 25 iterations, first run discarded.
 
 | variant                          |    p50 |    p95 | rows returned | approx bytes |
 |----------------------------------|-------:|-------:|--------------:|-------------:|
-| naive (SELECT + JS aggregate)    |  63 ms |  70 ms |        55,800 |     5,231 KB |
-| optimised (`rpc_cohort_performance`) | 80 ms | 117 ms |            20 |       3.9 KB |
+| naive (SELECT + JS aggregate)    |  51 ms |  69 ms |        44,640 |     4,185 KB |
+| optimised (`rpc_cohort_performance`) | 42 ms |  77 ms |             8 |       1.6 KB |
 
-Latency looks similar on localhost — 5 MB over loopback is basically free.
+Latency is similar on localhost — 4 MB over loopback is basically free.
 Over a real VPC it isn't, and either way the plan is the interesting part.
 
 <details>
@@ -65,24 +67,27 @@ Over a real VPC it isn't, and either way the plan is the interesting part.
 Before, only the baseline `(org_id, cohort_date)` index:
 
 ```
-Parallel Bitmap Heap Scan on cohort_daily
-  Recheck Cond: (org_id = ... AND cohort_date BETWEEN ...)
-  Filter: (day_index <= 30)
-  Rows Removed by Filter: 36000
-Execution Time: 120 ms
+Parallel Seq Scan on cohort_daily cd
+  Filter: (cohort_date BETWEEN ... AND day_index <= 30 AND org_id = ...)
+  Rows Removed by Filter: 116160
+  Buffers: shared hit=5897
+Execution Time: 26.7 ms
 ```
 
 After adding `(org_id, cohort_date, day_index) INCLUDE (…)`:
 
 ```
-Parallel Index Only Scan using cohort_daily_hot_path_idx
+Parallel Index Only Scan using cohort_daily_hot_path_idx on cohort_daily cd
   Index Cond: (all four columns)
   Heap Fetches: 0
-Execution Time: 25 ms
+  Buffers: shared hit=1512
+Execution Time: 20.9 ms
 ```
 
-~5× on the SQL side; `Heap Fetches: 0` is the tell. Full plans in
-`bench/results/`.
+Same rows, ~4× fewer buffer reads, `Heap Fetches: 0` — the index carries
+every projected column, no heap access. On a larger dataset (bump the
+seed via `SEED_COHORT_DAYS=180 SEED_CAMPAIGNS_PER_ORG=20`) the gap widens
+to ~5×. Full plans in `bench/results/`.
 
 </details>
 
@@ -95,7 +100,7 @@ Deno (`curl -fsSL https://deno.land/install.sh | sh`). Full walk-through in
 ```bash
 pnpm install
 supabase start                              # ~1 min first time
-pnpm db:reset && pnpm db:seed               # ~30s, ~2M rows
+pnpm db:reset && pnpm db:seed               # ~4s, ~400k rows
 pnpm functions:serve                        # BFF, another shell
 pnpm web:dev                                # dashboard on :5173
 ```
@@ -111,82 +116,24 @@ eval "$(node scripts/sign-mcp-jwt.mjs)"     # exports JWT + URL + ORG_ID
 pnpm mcp:inspect                            # or wire the same env into Claude
 ```
 
-## Decisions, said plainly
-
-**RLS as the enforcement boundary, not app-layer filters.** App-layer
-filters are a bug away from a leak — RLS runs even if the middleware
-forgets. Overhead is a subquery per row and the planner folds it.
-
-**BFF returns 403 on a cross-tenant `X-Org-Id`, not empty.** RLS alone
-would give you `200 []`, which is a UX disaster to debug from the client
-side. So the BFF checks membership up front. RLS still catches anything
-that slips.
-
-**No privileged key in the BFF.** Only anon + the caller's forwarded JWT.
-A grep test fails CI if `service_role` shows up anywhere under
-`supabase/functions/`.
-
-**Money as `bigint` micros in the source currency.** No floats in the
-source of truth. Conversion to USD happens once, in the RPC, via a JOIN to
-`fx_rates`. A tiny JS helper (`microsToUsd`) exists for one-off formatting
-outside the hot path.
-
-**No ORM.** The one query that matters is a plpgsql RPC with dynamic SQL,
-a covering index, and `UNIQUE NULLS NOT DISTINCT` on the natural key.
-Those are things you fight ORMs to reach. A hundred lines of SQL is easier
-to `EXPLAIN`.
-
-**Aggregate in SQL, weight in TS (`score_creatives`).** SQL returns raw
-per-creative components; TS applies the weighted formula. Weights can
-change without a migration and the formula has unit tests.
-
-**Cursor pagination on `/campaigns`, not offset.** Offset gets slower as
-the offset grows. Cursor is O(1) via the PK index.
-
-**`UNIQUE NULLS NOT DISTINCT` on `cohort_daily`, no surrogate PK.**
-`creative_id` is nullable (campaign-level cohorts exist). Postgres 15+
-lets NULL participate in a unique constraint if you say so. Simpler than
-a sentinel UUID.
-
-**`max(cohort_date)` as the anchor for `score_creatives`, not
-`current_date`.** `current_date` is fine when the ETL is running, but
-breaks any static dataset (demo, tests, staging clone). Anchoring to the
-freshest row the caller can see tracks reality in prod and self-corrects
-elsewhere. RLS keeps the `max` per-tenant.
-
-**`VACUUM ANALYZE` at the end of the seeder.** Without it the covering
-index is ignored until autovacuum catches up, and the first few
-benchmark runs are meaningless. Cheap enough to just do it.
-
 ## Limits worth flagging
 
-- Seed users are inserted with raw SQL, which means the seeder has to set
-  a handful of GoTrue-required columns that a normal admin API call would
-  fill in for you. The current seeder is patched but the boundary between
-  "our SQL" and "Supabase's schema" is real; production would go through
+- Seed users are inserted with raw SQL and a matching `auth.identities`
+  row, which means the seeder has to set every string column GoTrue's Go
+  struct reads as raw `string`. The current seeder covers what's needed
+  for Supabase Cloud today, but the boundary between "our SQL" and
+  "Supabase's schema" is real; production would go through
   `supabase.auth.admin.createUser`.
 - `pROAS` in responses is `ROAS × 1.5` — a placeholder for a real
   prediction model. Every LLM tool description and every UI cell flags it
-  as a prediction. Not a shortcut I'd take for a real product.
+  as a prediction.
 - The Meta Ads connector in `bench/` is fake. It exists to show the shape
   of an ingest pipeline (retry with jitter, token-bucket rate limit,
   idempotent upsert on the natural key). A real one has a lot more
   edge cases.
 - No SKAN / probabilistic attribution. Separate math problem, out of scope.
-- No caching layer. I'd add ETag + a Redis rollup once the read patterns
+- No caching layer. Would add ETag + a Redis rollup once the read patterns
   are actually known, not up-front.
-
-## What I'd do next
-
-1. Materialised cohort rollups, updated incrementally by an hourly job.
-   Hot query becomes a range scan on already-aggregated rows.
-2. ETag on `/campaigns`; Redis in front of the RPC keyed by
-   `(org_id, hash(request))` with a 60s TTL, invalidated on ingest.
-3. `POST /cohort-performance-export` streaming NDJSON, so a 500k-row
-   export doesn't buffer in memory.
-4. OAuth for MCP instead of a static JWT. Short-lived, org-scoped tokens.
-5. OpenTelemetry traces. Right now `db.ms` / `total.ms` only surface via
-   the `Server-Timing` header.
 
 ## Deploy
 

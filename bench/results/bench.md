@@ -5,8 +5,8 @@ Iterations per variant: **25** (warm cache, first run discarded).
 
 | variant | p50 (ms) | p95 (ms) | rows returned | approx bytes |
 |---|---:|---:|---:|---:|
-| naive (SELECT rows -> Node aggregate) | 62.3 | 77.9 | 55,800 | 5231.3 KB |
-| optimised (rpc_cohort_performance) | 76.4 | 88.6 | 20 | 3.9 KB |
+| naive (SELECT rows -> Node aggregate) | 51.3 | 69.1 | 44,640 | 4185.0 KB |
+| optimised (rpc_cohort_performance) | 42.4 | 77.1 | 8 | 1.6 KB |
 
 Speedup (p95): **0.9x**  
-Rows-over-wire reduction: **2790x**
+Rows-over-wire reduction: **5580x**

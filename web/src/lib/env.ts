@@ -27,20 +27,5 @@ export const SUPABASE_ANON_KEY =
     // Local supabase default. Only works against the docker stack.
     : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 
-// One-time debug log so a broken env value shows up in the console without
-// leaking the full anon key. Safe to keep in prod — anon key isn't a secret.
-if (typeof window !== "undefined") {
-  // eslint-disable-next-line no-console
-  console.info(
-    "[cohort-lens/env]",
-    JSON.stringify({
-      url: SUPABASE_URL,
-      keyLen: SUPABASE_ANON_KEY.length,
-      keyStart: SUPABASE_ANON_KEY.slice(0, 8),
-      keyEnd: SUPABASE_ANON_KEY.slice(-8),
-    }),
-  );
-}
-
 /** Base for BFF calls — includes the /functions/v1 prefix. */
 export const BFF_URL = `${SUPABASE_URL}/functions/v1`;
