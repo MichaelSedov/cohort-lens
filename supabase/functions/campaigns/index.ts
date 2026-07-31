@@ -1,6 +1,6 @@
 import { requireAuth } from "../_shared/auth.ts";
 import { clientForRequest, timed } from "../_shared/db.ts";
-import { errorResponse, respond } from "../_shared/errors.ts";
+import { errorResponse, handleCorsPreflight, respond } from "../_shared/errors.ts";
 import { CampaignsQuery } from "../_shared/schemas.ts";
 
 /**
@@ -10,6 +10,8 @@ import { CampaignsQuery } from "../_shared/schemas.ts";
  * campaigns per org.
  */
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   const startedAt = performance.now();
   if (req.method !== "GET") return errorResponse("bad_request", "GET only");
 

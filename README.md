@@ -1,14 +1,14 @@
 # cohort-lens
 
-Multi-tenant marketing analytics prototype. Three layers:
+Multi-tenant marketing analytics slice. Three layers:
 
 - Postgres with RLS as the isolation boundary
 - Deno Edge Functions as the BFF
-- React dashboard + an MCP server + an in-app AI chat panel on top
+- React dashboard + MCP server + in-app AI chat panel on top
 
-Built to pitch a Senior Full-Stack role at an ad-analytics SaaS. Focus is on
-tenant isolation and query performance — the two things that hurt when they
-break in that space. Everything else is small on purpose.
+Scope is deliberately narrow: cohort-based ROAS / pROAS / creative scoring
+across a few seeded tenants. The two things it actually invests in are
+tenant isolation and hot-query performance.
 
 ## Layout
 
@@ -22,7 +22,6 @@ web/              React + Vite dashboard with a chat panel
 mcp-server/       stdio MCP server (Claude Desktop / Cursor)
 bench/            naive-vs-optimised harness + fake Meta connector
 tests/            43 tests: RLS · contract · connector · mcp-client · units
-demo/             SQL patches to break/restore an RLS policy on the fly
 scripts/          JWT signer for MCP env
 ```
 
@@ -31,9 +30,8 @@ scripts/          JWT signer for MCP env
 **Isolation lives in the DB.** RLS on every tenant table, one helper
 (`current_user_org_ids()`) drives every policy. The BFF also validates
 `X-Org-Id` against membership and returns a real `403 org_forbidden` —
-better UX than a silent `200 []` if the client is confused. Both paths have
-tests. `demo/break-policy.sql` widens the helper on the running DB so you
-can watch the isolation suite fail live in about a second, then restore.
+better UX than a silent `200 []` if the client is confused. Both paths
+have tests.
 
 **Aggregation happens in SQL.** Four RPCs return already-grouped rows, FX
 conversion via `JOIN fx_rates`. One covering index turns the hot query into
@@ -190,12 +188,10 @@ benchmark runs are meaningless. Cheap enough to just do it.
 5. OpenTelemetry traces. Right now `db.ms` / `total.ms` only surface via
    the `Server-Timing` header.
 
-## Demo
+## Deploy
 
-[DEMO.md](DEMO.md) — three beats, ~90 seconds. Break an RLS policy live
-and watch the isolation suite fail. Show the bench. Ask the in-app AI
-panel "which creatives should we scale in Germany?" and watch it call
-`list_campaigns` then `score_creatives`, then explain the components.
+See [DEPLOY.md](DEPLOY.md) for pushing the schema + Edge Functions to a
+Supabase project and the dashboard to Vercel.
 
 ## License
 

@@ -3,6 +3,7 @@
 // and attaches X-Org-Id from the caller. Non-2xx responses that carry the
 // BFF's error envelope raise a `BffError` with the code preserved.
 
+import { BFF_URL } from "./env";
 import { supabase } from "./supabase";
 
 export class BffError extends Error {
@@ -48,7 +49,7 @@ async function currentJwt(): Promise<string | null> {
 async function post<T>(fn: string, orgId: string, body: unknown): Promise<{ body: T; serverTiming: string | null }> {
   const jwt = await currentJwt();
   if (!jwt) throw new BffError("unauthorized", "no active session", 401);
-  const res = await fetch(`/functions/v1/${fn}`, {
+  const res = await fetch(`${BFF_URL}/${fn}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

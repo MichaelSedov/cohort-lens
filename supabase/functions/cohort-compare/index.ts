@@ -1,9 +1,11 @@
 import { requireAuth } from "../_shared/auth.ts";
 import { clientForRequest, timed } from "../_shared/db.ts";
-import { errorResponse, respond } from "../_shared/errors.ts";
+import { errorResponse, handleCorsPreflight, respond } from "../_shared/errors.ts";
 import { CohortCompareRequest } from "../_shared/schemas.ts";
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   const startedAt = performance.now();
   if (req.method !== "POST") return errorResponse("bad_request", "POST only");
 

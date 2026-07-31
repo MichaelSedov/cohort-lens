@@ -2,6 +2,7 @@
 // reader rather than EventSource because EventSource doesn't support POST and
 // can't set the Authorization header — both are required here.
 
+import { BFF_URL } from "./env";
 import { supabase } from "./supabase";
 
 export type ChatEvent =
@@ -30,7 +31,7 @@ export async function ask(opts: {
   const jwt = data.session?.access_token;
   if (!jwt) throw new Error("not signed in");
 
-  const res = await fetch("/functions/v1/ask", {
+  const res = await fetch(`${BFF_URL}/ask`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

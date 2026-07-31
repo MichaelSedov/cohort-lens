@@ -19,7 +19,7 @@
 // model's ground truth stays visible to the user.
 
 import { requireAuth } from "../_shared/auth.ts";
-import { errorResponse } from "../_shared/errors.ts";
+import { CORS_HEADERS, errorResponse, handleCorsPreflight } from "../_shared/errors.ts";
 import { TOOL_DEFS, TOOLS } from "../_shared/tools-catalog.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -98,6 +98,8 @@ type ToolCall = {
 };
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   if (req.method !== "POST") return errorResponse("bad_request", "POST only");
 
   const ctx = await requireAuth(req);
@@ -232,6 +234,7 @@ Deno.serve(async (req) => {
 
   return new Response(stream, {
     headers: {
+      ...CORS_HEADERS,
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       "Connection": "keep-alive",
