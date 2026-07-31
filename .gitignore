@@ -2,9 +2,18 @@ node_modules/
 dist/
 .env
 .env.local
+.env.*.local
+supabase/functions/.env
 *.log
 .DS_Store
 coverage/
 .vitest-cache/
+.vite/
 supabase/.branches/
 supabase/.temp/
+
+# defensive: never commit AI-tool configs or generated notes
+.claude/
+CLAUDE.md
+.cursor/
+.aider*

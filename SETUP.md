@@ -52,15 +52,25 @@ The seeder also runs `VACUUM ANALYZE` at the end so the planner has fresh
 stats + a hot visibility map — otherwise the first several benchmark runs
 are slow for no reason.
 
-## 5. Start the BFF and (optionally) the MCP server
+## 5. Start the BFF, the dashboard, and (optionally) the MCP server
 
-In one shell:
+The AI chat panel needs an OpenRouter key. If you're skipping AI, ignore
+the .env step below — the rest works without it.
+
+```bash
+# once, only if you want the AI panel
+cp supabase/functions/.env.example supabase/functions/.env
+# open the .env, paste your key from https://openrouter.ai/keys
+```
+
+Three shells:
 
 ```bash
 pnpm functions:serve   # BFF on :54321/functions/v1
+pnpm web:dev           # React dashboard on :5173
 ```
 
-In another (for the MCP server):
+For the MCP server:
 
 ```bash
 eval "$(node scripts/sign-mcp-jwt.mjs)"        # analyst@acme-games.test by default

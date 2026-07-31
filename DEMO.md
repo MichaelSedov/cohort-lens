@@ -61,40 +61,38 @@ Follow up by showing the EXPLAIN pair in
 `Bitmap Heap Scan` with `Rows Removed by Filter: 36000`; the "after" is a
 `Parallel Index Only Scan` with `Heap Fetches: 0`.
 
-## Beat 3 — "here is Claude answering a real question" (~50s)
+## Beat 3 — "here is the model answering a real question" (~50s)
 
 **Say:**
-> "The MCP server wraps the same BFF. Claude never sees another tenant's
-> data — every request forwards the caller's JWT and RLS decides what's
-> visible."
+> "The dashboard has an in-app AI panel that calls the same BFF via
+> OpenRouter. Same auth path as everything else — the model never sees
+> another tenant's data, RLS decides for it."
 
 **Do:**
 
+1. Open `http://localhost:5173`, log in as `analyst @ acme-games`.
+2. In the AI panel at the top, click the suggestion **"Which creatives should we scale in Germany?"** (or type your own).
+
+Expected: two tool pills fire — `list_campaigns(country="DE")` and
+`score_creatives(...)`. Then a markdown table appears with creative names,
+scores, and component breakdown. Click a green pill to expand the raw
+tool result — that's the ground truth the model reasoned from.
+
+Follow-ups you can ask on the same screen:
+- *"How did meta perform in April vs March?"* — triggers `compare_periods`.
+- *"Any spend anomaly recently?"* — usually hits `get_cohort_performance`
+  and spots the seeded 5× spike on `2026-04-01`.
+
+**MCP path (alternative — for a technical audience):** same tools, external
+client:
+
 ```bash
-# Mint a 12h JWT + export the MCP config.
 eval "$(node scripts/sign-mcp-jwt.mjs)"
-pnpm mcp:inspect
+pnpm mcp:inspect                       # or wire into Claude Desktop
 ```
 
-The MCP Inspector opens in a browser. Under **Tools**, four appear:
-`list_campaigns`, `get_cohort_performance`, `compare_periods`,
-`score_creatives`. Under **Resources**, the metrics glossary.
-
-Now point Claude Desktop (or `claude mcp add`) at the server and ask:
-
-> **"Which creatives should we scale in Germany?"**
-
-Expected model behaviour, driven by the tool descriptions:
-1. `list_campaigns` filtered to `country=DE` (the tool descriptions tell
-   the model that the other tools expect uuids).
-2. `score_creatives` with the returned `campaignIds`,
-   `benchmarkWindowDays=30`, `dayIndex=30`.
-3. Present the top few rows, with the `components` breakdown, mentioning
-   that `pRoas` is a *predicted* value (the glossary + every tool's
-   description flags this).
-
-If the model tries to compute deltas by itself, `compare_periods`'s
-description tells it not to — it will use the dedicated tool.
+Point Claude Desktop at the same env and ask the same question. Same
+routing, same auth, same isolation — different transport.
 
 ## Reset
 
