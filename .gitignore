@@ -9,6 +9,7 @@ supabase/functions/.env
 coverage/
 .vitest-cache/
 .vite/
+*.tsbuildinfo
 supabase/.branches/
 supabase/.temp/
 
