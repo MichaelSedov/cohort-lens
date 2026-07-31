@@ -9,10 +9,12 @@ const envUrl = import.meta.env.VITE_SUPABASE_URL?.toString().trim();
 export const SUPABASE_URL = envUrl && envUrl.length > 0 ? envUrl : window.location.origin;
 
 /** anon key — safe in the browser; RLS + Auth still enforce everything. */
+const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.toString().trim();
 export const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ??
-  // Local supabase default. Only works against the docker stack.
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+  envKey && envKey.length > 0
+    ? envKey
+    // Local supabase default. Only works against the docker stack.
+    : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 
 /** Base for BFF calls — includes the /functions/v1 prefix. */
 export const BFF_URL = `${SUPABASE_URL}/functions/v1`;
